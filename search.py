@@ -49,7 +49,7 @@ class CornerReversiState:
           Returns a list of legal moves from the current state.
         """
         next_player = self.player2 if self.cur_player == self.player1 else self.player1
-        return """YOUR CODE HERE""" # RETURN THE LIST OF VALID MOVES
+        return get_valid_moves(self.board, self.height, self.width, self.cur_player, next_player, self.blocked_cell_label, self.ignore_block_cells_in_captures) 
 
     def result(self, move):
         """
@@ -64,8 +64,16 @@ class CornerReversiState:
         result_board[move] = self.cur_player
         # flip enemy
         for enemy in enemy_captured_by_move(self.board, move, self.cur_player, adversary, self.blocked_cell_label, self.ignore_block_cells_in_captures):
-            result_board[enemy] = """YOUR CODE HERE""" # update the board
-        return """YOUR CODE HERE""" # RETURN THE NEW STATE CONSIDERING THE UPDATES
+            result_board[enemy] = self.cur_player # update the board
+        return CornerReversiState(
+            result_board,
+            self.player1,
+            self.player2,
+            adversary,
+            self.height,
+            self.width,
+            self.ignore_block_cells_in_captures,
+        )
 
     # Utilities for comparison and display
     def __eq__(self, other):
@@ -178,6 +186,18 @@ class AllCornersReversiSearchProblem(CornerReversiSearchProblem):
         return state.isGoal(4)
 
 
+class GameTreeNode:
+    """Nodo para representar el árbol de juego."""
+    def __init__(self, state, action=None, depth=0):
+        self.state = state
+        self.action = action
+        self.depth = depth
+        self.children = []
+
+    def __repr__(self):
+        return f"GameTreeNode(depth={self.depth}, children={len(self.children)})"
+
+
 def build_game_tree(search_problem, max_depth):
     """
     Greates a game tree from a search problem until max_depth.
@@ -192,11 +212,61 @@ def build_game_tree(search_problem, max_depth):
         "max_depth": 0,
         "branching_sum": 0,
         "internal_nodes": 0,
-        }
+    }
 
-    """YOUR CODE HERE"""
+    # 1. Obtenemos el estado inicial
+    if hasattr(search_problem, 'getStartState'):
+        start_state = search_problem.getStartState()
+    else:
+        start_state = search_problem
 
-    return None, stats
+    # 2. Creamos el nodo raíz y la pila de exploración (DFS)
+    root = GameTreeNode(start_state, action=None, depth=0)
+    stack = util.Stack()
+    stack.push(root)
+    stats["nodes"] = 1
+
+    # 3. Recorremos con la pila hasta vaciarla
+    while not stack.isEmpty():
+        current_node = stack.pop()
+
+        if current_node.depth > stats["max_depth"]:
+            stats["max_depth"] = current_node.depth
+
+        # Caso A: Si alcanzamos la profundidad máxima, es una hoja (no ramificamos)
+        if current_node.depth >= max_depth:
+            stats["leaves"] += 1
+            continue
+
+        # Obtenemos los movimientos legales desde este estado
+        if hasattr(search_problem, 'getSuccessors'):
+            successors = search_problem.getSuccessors(current_node.state)
+        else:
+            successors = [(current_node.state.result(a), a) for a in current_node.state.legalMoves()]
+
+        # Caso B: Si no tiene movimientos legales posibles, también es una hoja
+        if len(successors) == 0:
+            stats["leaves"] += 1
+            continue
+
+        # Caso C: Tiene sucesores, por lo que es un nodo interno
+        stats["internal_nodes"] += 1
+        stats["branching_sum"] += len(successors)
+
+        # Generamos cada hijo, lo enlazamos al padre y lo apilamos para seguir explorándolo
+        for succ_state, action in successors:
+            child = GameTreeNode(succ_state, action, depth=current_node.depth + 1)
+            current_node.children.append(child)
+            stats["nodes"] += 1
+            stack.push(child)
+
+    # 4. Factor de ramificación medio = total_hijos_generados / total_nodos_internos
+    if stats["internal_nodes"] > 0:
+        stats["avg_branching_factor"] = stats["branching_sum"] / stats["internal_nodes"]
+    else:
+        stats["avg_branching_factor"] = 0.0
+
+    return root, stats
 
 
 def depthFirstSearch(search_problem):
@@ -213,27 +283,26 @@ def depthFirstSearch(search_problem):
     print("Is the start a goal?", search_problem.isGoalState(search_problem.getStartState()))
     print("Start's successors:", search_problem.getSuccessors(search_problem.getStartState()))
     """
-    num_visited = 0
     structure = util.Stack()
-    structure.push("""YOUR CODE HERE""") # DEFINE THE INITIAL STATE
-    visited = []
+    # Pila de tuplas: (estado_actual, camino_de_acciones)
+    structure.push((search_problem.getStartState(), []))
+    visited = set()
 
     while not structure.isEmpty():
-        path = structure.pop()
-        current_state = """YOUR CODE HERE""" # INDEX THE CURRENT STATE
+        current_state, actions = structure.pop()
+
+        if current_state in visited:
+            continue
+        visited.add(current_state)
 
         if search_problem.isGoalState(current_state):
-            return """YOUR CODE HERE""" # RETURN THE PATH OF STATES
+            return len(visited), actions
 
-        if current_state not in visited:
-            visited.append(current_state)
+        for successor, action in search_problem.getSuccessors(current_state):
+            if successor not in visited:
+                structure.push((successor, actions + [action]))
 
-            for successor in search_problem.getSuccessors(current_state):
-                if successor[0] not in visited:
-                    new_path = """YOUR CODE HERE""" # CREATE THE NEW PATH OF STATES
-                    structure.push(new_path)
-
-    return num_visited, None
+    return len(visited), None
 
 
 def breadthFirstSearch(search_problem):

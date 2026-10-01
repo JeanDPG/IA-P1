@@ -187,15 +187,11 @@ class AllCornersReversiSearchProblem(CornerReversiSearchProblem):
 
 
 class GameTreeNode:
-    """Nodo para representar el árbol de juego."""
     def __init__(self, state, action=None, depth=0):
         self.state = state
         self.action = action
         self.depth = depth
         self.children = []
-
-    def __repr__(self):
-        return f"GameTreeNode(depth={self.depth}, children={len(self.children)})"
 
 
 def build_game_tree(search_problem, max_depth):
@@ -214,53 +210,39 @@ def build_game_tree(search_problem, max_depth):
         "internal_nodes": 0,
     }
 
-    # 1. Obtenemos el estado inicial
-    if hasattr(search_problem, 'getStartState'):
-        start_state = search_problem.getStartState()
-    else:
-        start_state = search_problem
+    if not hasattr(search_problem, 'getStartState'):
+        search_problem = CornerReversiSearchProblem(search_problem)
 
-    # 2. Creamos el nodo raíz y la pila de exploración (DFS)
-    root = GameTreeNode(start_state, action=None, depth=0)
-    stack = util.Stack()
-    stack.push(root)
+    structure = util.Stack()
+    # Pila de tuplas: (nodo_actual, profundidad)
+    root = GameTreeNode(search_problem.getStartState(), depth=0)
+    structure.push((root, 0))
     stats["nodes"] = 1
 
-    # 3. Recorremos con la pila hasta vaciarla
-    while not stack.isEmpty():
-        current_node = stack.pop()
+    while not structure.isEmpty():
+        current_node, depth = structure.pop()
 
-        if current_node.depth > stats["max_depth"]:
-            stats["max_depth"] = current_node.depth
+        if depth > stats["max_depth"]:
+            stats["max_depth"] = depth
 
-        # Caso A: Si alcanzamos la profundidad máxima, es una hoja (no ramificamos)
-        if current_node.depth >= max_depth:
+        if depth >= max_depth:
             stats["leaves"] += 1
             continue
 
-        # Obtenemos los movimientos legales desde este estado
-        if hasattr(search_problem, 'getSuccessors'):
-            successors = search_problem.getSuccessors(current_node.state)
-        else:
-            successors = [(current_node.state.result(a), a) for a in current_node.state.legalMoves()]
-
-        # Caso B: Si no tiene movimientos legales posibles, también es una hoja
-        if len(successors) == 0:
+        successors = search_problem.getSuccessors(current_node.state)
+        if not successors:
             stats["leaves"] += 1
             continue
 
-        # Caso C: Tiene sucesores, por lo que es un nodo interno
         stats["internal_nodes"] += 1
         stats["branching_sum"] += len(successors)
 
-        # Generamos cada hijo, lo enlazamos al padre y lo apilamos para seguir explorándolo
-        for succ_state, action in successors:
-            child = GameTreeNode(succ_state, action, depth=current_node.depth + 1)
+        for successor, action in successors:
+            child = GameTreeNode(successor, action, depth=depth + 1)
             current_node.children.append(child)
             stats["nodes"] += 1
-            stack.push(child)
+            structure.push((child, depth + 1))
 
-    # 4. Factor de ramificación medio = total_hijos_generados / total_nodos_internos
     if stats["internal_nodes"] > 0:
         stats["avg_branching_factor"] = stats["branching_sum"] / stats["internal_nodes"]
     else:

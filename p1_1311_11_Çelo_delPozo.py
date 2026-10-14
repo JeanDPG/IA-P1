@@ -161,7 +161,7 @@ class Solution1(StudentHeuristic):
     """
 
     def get_name(self) -> str:
-        return "posicional_adaptativa"
+        return "Netan"
 
     def evaluation_function(self, state: TwoPlayerGameState) -> float:
         if state.end_of_game:
@@ -228,7 +228,7 @@ class Solution2(StudentHeuristic):
     """
 
     def get_name(self) -> str:
-        return "estrategica_movilidad"
+        return "yahu"
 
     def evaluation_function(self, state: TwoPlayerGameState) -> float:
         if state.end_of_game:
